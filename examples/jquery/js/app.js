@@ -1,5 +1,5 @@
 /*global jQuery, Handlebars, Router */
-jQuery(function ($) {
+document.addEventListener("DOMContentLoaded", function(){
 	'use strict';
 
 	Handlebars.registerHelper('eq', function (a, b, options) {
@@ -41,8 +41,13 @@ jQuery(function ($) {
 	var App = {
 		init: function () {
 			this.todos = util.store('todos-jquery');
-			this.todoTemplate = Handlebars.compile($('#todo-template').html());
-			this.footerTemplate = Handlebars.compile($('#footer-template').html());
+
+			var todoTemplateHtml = document.getElementById('todo-template').innerHTML
+			this.todoTemplate = Handlebars.compile(todoTemplateHtml)
+			
+			var footerTemplateHtml = document.getElementById('footer-template').innerHTML
+			this.footerTemplate = Handlebars.compile(footerTemplateHtml);
+
 			this.bindEvents();
 
 			new Router({
@@ -53,23 +58,76 @@ jQuery(function ($) {
 			}).init('/all');
 		},
 		bindEvents: function () {
-			$('.new-todo').on('keyup', this.create.bind(this));
-			$('.toggle-all').on('change', this.toggleAll.bind(this));
-			$('.footer').on('click', '.clear-completed', this.destroyCompleted.bind(this));
-			$('.todo-list')
-				.on('change', '.toggle', this.toggle.bind(this))
-				.on('dblclick', 'label', this.editingMode.bind(this))
-				.on('keyup', '.edit', this.editKeyup.bind(this))
-				.on('focusout', '.edit', this.update.bind(this))
-				.on('click', '.destroy', this.destroy.bind(this));
+			// event listener -- keyup 
+			document.addEventListener('keyup', function(e) {
+				if(e.target.className === 'new-todo') {
+					App.create.call(App, e)
+				} else if(e.target.className === 'edit') {
+					App.editKeyup.call(App, e)
+				}
+			})
+
+			// event listener -- change
+			document.addEventListener('change', function(e) {
+				if(e.target.className === 'toggle-all') {
+					App.toggleAll.call(App, e)
+				} else if(e.target.className === 'toggle') {
+					App.toggle.call(App, e)
+				}
+			})
+			
+			// event listener -- click
+			document.addEventListener('click', function(e) {
+				if(e.target.className === 'clear-completed') {
+					App.destroyCompleted.call(App)
+				} else if(e.target.className === 'destroy') {
+					App.destroy.call(App, e)
+				}
+			})
+
+			// event listener -- double click
+			document.addEventListener('dblclick', function(e) {
+				if(e.target.tagName === 'LABEL') {
+					App.editingMode.call(App, e)
+				}
+			})
+
+			// event listener -- focus out
+			document.addEventListener('focusout', function(e) {
+				if(e.target.className === 'edit') {
+					App.update.call(App, e)
+				}
+			})
 		},
 		render: function () {
 			var todos = this.getFilteredTodos();
-			$('.todo-list').html(this.todoTemplate(todos));
-			$('.main').toggle(todos.length > 0);
-			$('.toggle-all').prop('checked', this.getActiveTodos().length === 0);
+			
+			var todoListElement = document.getElementsByClassName('todo-list')[0]
+			todoListElement.innerHTML = this.todoTemplate(todos) 
+			
+			var mainElem = document.getElementsByClassName('main')[0]
+
+			// show/hide main section
+			if(todos.length > 0) {
+				mainElem.style.display = 'block'
+			} else {
+				mainElem.style.display = 'none'
+			}
+
+			// toggle all button styling
+			var toggleAllElem = document.querySelector('.toggle-all')
+		
+			if(this.getActiveTodos().length === 0) {
+				toggleAllElem.checked = true
+			} else {
+				toggleAllElem.checked = false
+			}
+
 			this.renderFooter();
-			$('.new-todo').focus();
+
+			var newTodoElem = document.querySelector('.new-todo')
+			newTodoElem.focus()
+
 			util.store('todos-jquery', this.todos);
 		},
 		renderFooter: function () {
@@ -82,10 +140,19 @@ jQuery(function ($) {
 				filter: this.filter
 			});
 
-			$('.footer').toggle(todoCount > 0).html(template);
+			var footerElem = document.querySelector('.footer')
+
+			if(todoCount > 0) {
+				footerElem.style.display = 'block'
+			} else {
+				footerElem.style.display = 'none'
+			}
+			
+			footerElem.innerHTML = template
+
 		},
 		toggleAll: function (e) {
-			var isChecked = $(e.target).prop('checked');
+			var isChecked = e.target.checked
 
 			this.todos.forEach(function (todo) {
 				todo.completed = isChecked;
@@ -121,7 +188,7 @@ jQuery(function ($) {
 		// accepts an element from inside the `.item` div and
 		// returns the corresponding index in the `todos` array
 		getIndexFromEl: function (el) {
-			var id = $(el).closest('li').data('id');
+			var id = el.closest('li').getAttribute('data-id')
 			var todos = this.todos;
 			var i = todos.length;
 
@@ -132,8 +199,8 @@ jQuery(function ($) {
 			}
 		},
 		create: function (e) {
-			var $input = $(e.target);
-			var val = $input.val().trim();
+			var input = e.target
+			var val = input.value
 
 			if (e.which !== ENTER_KEY || !val) {
 				return;
@@ -145,8 +212,8 @@ jQuery(function ($) {
 				completed: false
 			});
 
-			$input.val('');
-
+			input.value = ''
+			
 			this.render();
 		},
 		toggle: function (e) {
@@ -155,12 +222,16 @@ jQuery(function ($) {
 			this.render();
 		},
 		editingMode: function (e) {
-			var $input = $(e.target).closest('li').addClass('editing').find('.edit');
-			// puts caret at end of input
-			var tmpStr = $input.val();
-			$input.val('');
-			$input.val(tmpStr);
-			$input.focus();
+			var elem = (e.target).closest('li')
+			elem.className += 'editing'
+
+			var input = elem.querySelector('.edit')
+
+			var tmpstr = input.value
+			input.value = ''
+			input.value = tmpstr
+			input.focus()
+
 		},
 		editKeyup: function (e) {
 			if (e.which === ENTER_KEY) {
@@ -168,23 +239,22 @@ jQuery(function ($) {
 			}
 
 			if (e.which === ESCAPE_KEY) {
-				$(e.target).data('abort', true).blur();
+				e.target.setAttribute('data-abort', true)
+				e.target.blur()
 			}
 		},
 		update: function (e) {
 			var el = e.target;
-			var $el = $(el);
-			var val = $el.val().trim();
-			
-			if ($el.data('abort')) {
-				$el.data('abort', false);
+			var val = el.value.trim()
+
+			if (el.getAttribute('abort')) {
+				el.setAttribute('abort', false);
 			} else if (!val) {
 				this.destroy(e);
 				return;
 			} else {
 				this.todos[this.getIndexFromEl(el)].title = val;
 			}
-
 			this.render();
 		},
 		destroy: function (e) {
